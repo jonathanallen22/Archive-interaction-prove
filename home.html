@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archivio Interattivo Distorto</title>
+    <style>
+        :root {
+            --font-main: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            height: 100%; 
+            overflow: hidden; 
+            font-family: var(--font-main); 
+            background: #fff; 
+            user-select: none;
+        }
+
+        header { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 20px 40px; 
+            position: fixed; 
+            width: 100%; 
+            top: 0; 
+            z-index: 100; 
+            box-sizing: border-box; 
+        }
+        
+        .logo { 
+            width: 0; height: 0; 
+            border-left: 10px solid transparent; 
+            border-right: 10px solid transparent; 
+            border-bottom: 15px solid black; 
+            position: relative; 
+        }
+        .logo::after { 
+            content: ''; position: absolute; 
+            top: 2px; left: -10px; width: 0; height: 0; 
+            border-left: 10px solid transparent; 
+            border-right: 10px solid transparent; 
+            border-top: 15px solid black; 
+        }
+
+       .grid-container { 
+            margin-top: 70px;
+            height: calc(100vh - 100px);
+            display: grid;
+            grid-template-columns: var(--c1, 33.33%) var(--c2, 33.33%) var(--c3, 33.33%);
+            grid-template-rows: var(--r1, 50%) var(--r2, 50%);
+            width: calc(100vw - 80px);
+            margin-left: 40px;
+            margin-right: 40px;
+            gap: 10px; /* ECCO IL GAP: crea lo spazio orizzontale e verticale */
+            position: relative;
+        }
+
+        .cell {
+            position: relative;
+            border: 1px solid black;
+            /* Ho eliminato il margin negativo che le faceva toccare */
+            overflow: hidden;
+            background: #fff;
+        }
+
+        /* --- MANIGLIE PER IL TRASCINAMENTO (Draggers) --- */
+        .resizer-v {
+            position: absolute;
+            top: 0; bottom: 0; width: 14px;
+            cursor: col-resize; z-index: 50;
+            transform: translateX(-50%);
+        }
+        .resizer-h {
+            position: absolute;
+            left: 0; right: 0; height: 14px;
+            cursor: row-resize; z-index: 50;
+            transform: translateY(-50%);
+        }
+        /* Maniglie visibili agli incroci */
+        .resizer-c { 
+            position: absolute;
+            width: 12px; height: 12px;
+            background: black;
+            cursor: nwse-resize;
+            z-index: 60;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 0 4px rgba(255,255,255,0.5); /* Per renderlo afferrabile */
+        }
+        
+        /* Puntini neri decorativi agli angoli del box */
+        .corner-dot { position: absolute; width: 5px; height: 5px; background: black; z-index: 10; }
+        .dot-tl { top: -1px; left: -1px; }
+        .dot-tr { top: -1px; right: -1px; }
+        .dot-bl { bottom: -1px; left: -1px; }
+        .dot-br { bottom: -1px; right: -1px; }
+
+        /* --- CONTENUTO (Che si distorce) --- */
+        /* Questo wrapper ha dimensioni fisse (800x600). Tramite JS lo scalo con transform per creare la distorsione perfetta */
+        .content-wrapper {
+            position: absolute;
+            top: 0; left: 0;
+            width: 800px;
+            height: 600px;
+            transform-origin: top left;
+            pointer-events: none; /* Lascia l'interazione al container genitore */
+        }
+
+        /* Le linee incrociate stile bounding-box */
+        .cross-lines {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
+            z-index: 1;
+        }
+        .cross-lines line { stroke: black; stroke-width: 1px; }
+
+        /* Contenitore Immagine */
+        .image-container {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 320px; height: 420px;
+            pointer-events: auto;
+            z-index: 2;
+            cursor: pointer;
+        }
+        
+        .image-container img {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            object-fit: cover;
+            transition: opacity 0.4s ease;
+        }
+        
+       .default-img { 
+            opacity: 1; 
+            filter: grayscale(100%) contrast(1.1); 
+        }
+        
+        .hover-img { 
+            opacity: 0; 
+            filter: contrast(1.1); 
+            /* Stato iniziale della seconda foto prima dell'hover */
+            transform: translate(25px, 25px) rotate(5deg) scale(0.95);
+            transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            z-index: 5; /* Assicura che appaia sopra */
+        }
+        
+        /* ELIMINIAMO la riga che nascondeva .default-img. Ora rimane visibile! */
+        /* .cell:hover .default-img { opacity: 0; } <- CANCELLATA */
+        
+        /* Effetto Hover sull'intero box o sull'immagine */
+       .cell:hover .hover-img { 
+            opacity: 1; 
+            /* La foto scivola in posizione sovrapponendosi sfalsata */
+            transform: translate(15px, 15px) rotate(2deg) scale(1); 
+            box-shadow: -10px 10px 25px rgba(0,0,0,0.4); /* Crea il senso di profondità tra i due "fogli" */
+        }
+
+        /* Testi stile Highlight */
+        .labels {
+            position: absolute; top: 40px; left: 40px;
+            pointer-events: none;
+            z-index: 3;
+        }
+        
+        .label-group { margin-bottom: 50px; }
+        
+       .black-label {
+            background: black; color: white;
+            display: inline-block; padding: 4px 10px; margin-bottom: 4px;
+            font-size: 18px; /* Aumentato da 14px */
+            clear: left; float: left;
+            pointer-events: auto;
+            border: 1px solid white;
+        }
+        
+        .desc-label {
+            max-width: 450px; /* Allargato un po' per contenere il font più grande */
+            white-space: normal;
+            display: inline;
+            background: black; color: white;
+            padding: 4px 0;
+            box-decoration-break: clone;
+            -webkit-box-decoration-break: clone;
+            line-height: 1.6; 
+            font-size: 17px; /* Aumentato da 13px */
+            border: 1px solid transparent; 
+        }
+        .desc-wrapper {
+            float: left; clear: left; max-width: 380px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo"></div>
+        <a href="#" style="text-decoration:none; color:black;">menu</a>
+    </header>
+
+    <div class="grid-container" id="grid">
+        <!-- Le 6 celle vengono generate da JavaScript qui -->
+    </div>
+
+    <script>
+        // DATI ARTICOLI
+        const articles = [
+            { title: "BURNOUT CLARITY", author: "Michele Mazzocchi", date: "January 2026", country: "Argentina", time: "10 mins", type: "Fiction", desc: "On misreading, immune syntax and the network logic of disease. A two-part investigation from Buenos Aires on what happens when biological systems speak." },
+            { title: "ROAD TO NOWHERE", author: "Olmo Notarianni", date: "January 2026", country: "USA", time: "12 mins", type: "Essay", desc: "An architectural exploration of the voids left by modern infrastructures and the beauty of abandoned spaces." },
+            { title: "WEAVING MY RHAPSODY", author: "Matilde Filippi", date: "January 2026", country: "UK", time: "3 mins", type: "Poetry", desc: "Abstract thoughts on the fabric of time. An editorial on the geometry of daily routines in modern society." },
+            { title: "DON'T MISS YOUR STOP", author: "Lenny Stratas", date: "April 2026", country: "France", time: "7 mins", type: "Fiction", desc: "Is physics intuition any different from aesthetic criteria? What do Dirac, Escher, and Lenny have in common? A scientific's hunt for beauty as method." },
+            { title: "OLTRE LA SIEPE", author: "Elena Bassani", date: "January 2026", country: "Italy", time: "5 mins", type: "Editorial", desc: "Speculative design on the boundaries between natural landscapes and artificial brutalist monolithic structures." },
+            { title: "A LIL MOUSE MOVING", author: "Marquis", date: "January 2026", country: "Spain", time: "8 mins", type: "Analysis", desc: "Tracking the cursor as a form of digital dance. The choreography of user interactions and pixel pushing on the screen." }
+        ];
+
+        // IMMAGINI FORNITE (Dimezzate per Default vs Hover)
+        const images = [
+            'https://enricoisidori.com/assets/digitalforest/optimized/01.webp',
+            'https://enricoisidori.com/assets/rhytuals/optimized/r-1.webp',
+            'https://enricoisidori.com/assets/n-plus/optimized/n-1.webp',
+            'https://enricoisidori.com/assets/imageofabook/optimized/3.webp',
+            'https://enricoisidori.com/assets/pixelpushing/optimized/preview1.webp',
+            'https://enricoisidori.com/assets/monolite/optimized/2.webp',
+            'https://enricoisidori.com/assets/n-plus/optimized/adv1.webp'
+        ];
+        
+        const grid = document.getElementById('grid');
+        
+        // GENERA LA GRIGLIA
+        articles.forEach((art, i) => {
+            // Usa le prime immagini come default, le successive come hover
+            const defImg = images[i % images.length];
+            const hovImg = images[(i + 4) % images.length];
+
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            
+            // Layout interno del box (fisso a 800x600 che poi verrà scalato)
+            cell.innerHTML = `
+                <div class="corner-dot dot-tl"></div><div class="corner-dot dot-tr"></div>
+                <div class="corner-dot dot-bl"></div><div class="corner-dot dot-br"></div>
+                
+                <div class="content-wrapper" id="cw-${i}">
+                    <!-- Linee a croce in SVG -->
+                    <svg class="cross-lines" viewBox="0 0 800 600" preserveAspectRatio="none">
+                        <line x1="0" y1="0" x2="800" y2="600" />
+                        <line x1="0" y1="600" x2="800" y2="0" />
+                    </svg>
+                    
+                    <div class="image-container">
+                        <img src="${defImg}" class="default-img">
+                        <img src="${hovImg}" class="hover-img">
+                    </div>
+                    
+                    <div class="labels">
+                        <div class="label-group">
+                            <div class="black-label">${art.title}</div>
+                            <div class="black-label">${art.author}</div>
+                            <div class="black-label">${art.date}</div>
+                            <div class="black-label">${art.country}</div>
+                        </div>
+                        <div class="label-group">
+                            <div class="black-label">${art.time}</div>
+                            <div class="black-label">${art.type}</div>
+                        </div>
+                        <div class="label-group desc-wrapper">
+                            <span class="desc-label">&nbsp;${art.desc}&nbsp;</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(cell);
+        });
+
+        // ----------------------------------------------------
+        // LOGICA DI DISTORSIONE (Squash & Stretch)
+        // ----------------------------------------------------
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                const rect = entry.contentRect;
+                const wrapper = entry.target.querySelector('.content-wrapper');
+                if(wrapper) {
+                    // Calcola il rapporto di scala basandosi sulle dimensioni del contenitore genitore vs 800x600
+                    const scaleX = rect.width / 800;
+                    const scaleY = rect.height / 600;
+                    // Questo crea la distorsione perfetta (sia del testo che delle immagini e linee)
+                    wrapper.style.transform = `scale(${scaleX}, ${scaleY})`;
+                }
+            }
+        });
+
+        // Applica l'observer a tutte le celle
+        document.querySelectorAll('.cell').forEach(cell => resizeObserver.observe(cell));
+
+
+        // ----------------------------------------------------
+        // LOGICA DELLE MANIGLIE DI RIDIMENSIONAMENTO (Grid Dragging)
+        // ----------------------------------------------------
+        
+        // Percentuali iniziali di righe e colonne (3 colonne, 2 righe)
+        let colWidths = [33.33, 33.33, 33.33];
+        let rowHeights = [50, 50];
+
+        function applyGrid() {
+            grid.style.setProperty('--c1', colWidths[0] + '%');
+            grid.style.setProperty('--c2', colWidths[1] + '%');
+            grid.style.setProperty('--c3', colWidths[2] + '%');
+            grid.style.setProperty('--r1', rowHeights[0] + '%');
+            grid.style.setProperty('--r2', rowHeights[1] + '%');
+        }
+        applyGrid();
+
+        // Funzione per creare linee di trascinamento trasparenti
+        function createDragger(type, idx) {
+            const el = document.createElement('div');
+            el.className = type === 'v' ? 'resizer-v' : 'resizer-h';
+            grid.appendChild(el);
+            
+            const updatePos = () => {
+                if (type === 'v') {
+                    let left = 0; for(let i=0; i<=idx; i++) left += colWidths[i];
+                    el.style.left = left + '%';
+                } else {
+                    let top = 0; for(let i=0; i<=idx; i++) top += rowHeights[i];
+                    el.style.top = top + '%';
+                }
+            };
+            updatePos();
+
+            let isDragging = false;
+            el.addEventListener('mousedown', () => { isDragging = true; });
+
+            window.addEventListener('mousemove', (e) => {
+                if(!isDragging) return;
+                const gridRect = grid.getBoundingClientRect();
+                
+                if (type === 'v') {
+                    let pct = ((e.clientX - gridRect.left) / gridRect.width) * 100;
+                    let minPct = (idx === 0) ? 10 : colWidths[0] + 10;
+                    let maxPct = (idx === 0) ? 100 - colWidths[2] - 10 : 90;
+                    pct = Math.max(minPct, Math.min(maxPct, pct));
+                    
+                    if (idx === 0) {
+                        let diff = pct - colWidths[0];
+                        colWidths[0] = pct; colWidths[1] -= diff;
+                    } else {
+                        let totalLeft = colWidths[0] + colWidths[1];
+                        let diff = pct - totalLeft;
+                        colWidths[1] += diff; colWidths[2] -= diff;
+                    }
+                } else {
+                    let pct = ((e.clientY - gridRect.top) / gridRect.height) * 100;
+                    pct = Math.max(10, Math.min(90, pct));
+                    let diff = pct - rowHeights[0];
+                    rowHeights[0] = pct; rowHeights[1] -= diff;
+                }
+                applyGrid(); updateAllDraggers();
+            });
+            window.addEventListener('mouseup', () => { isDragging = false; });
+            return { el, updatePos };
+        }
+
+        // Funzione per creare i quadratini neri interattivi sugli incroci
+        function createCornerHandle(vIdx, hIdx) {
+            const el = document.createElement('div');
+            el.className = 'resizer-c';
+            grid.appendChild(el);
+            
+            const updatePos = () => {
+                let left = 0; for(let i=0; i<=vIdx; i++) left += colWidths[i];
+                let top = 0; for(let i=0; i<=hIdx; i++) top += rowHeights[i];
+                el.style.left = left + '%';
+                el.style.top = top + '%';
+            };
+            updatePos();
+
+            let isDragging = false;
+            el.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                e.preventDefault();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if(!isDragging) return;
+                const gridRect = grid.getBoundingClientRect();
+                
+                // Aggiorna l'asse X (Colonne)
+                let pctX = ((e.clientX - gridRect.left) / gridRect.width) * 100;
+                let minPctX = (vIdx === 0) ? 10 : colWidths[0] + 10;
+                let maxPctX = (vIdx === 0) ? 100 - colWidths[2] - 10 : 90;
+                pctX = Math.max(minPctX, Math.min(maxPctX, pctX));
+                
+                if (vIdx === 0) {
+                    let diffX = pctX - colWidths[0];
+                    colWidths[0] = pctX; colWidths[1] -= diffX;
+                } else {
+                    let diffX = pctX - (colWidths[0] + colWidths[1]);
+                    colWidths[1] += diffX; colWidths[2] -= diffX;
+                }
+
+                // Aggiorna l'asse Y (Righe)
+                let pctY = ((e.clientY - gridRect.top) / gridRect.height) * 100;
+                pctY = Math.max(10, Math.min(90, pctY));
+                let diffY = pctY - rowHeights[0];
+                rowHeights[0] = pctY; rowHeights[1] -= diffY;
+
+                applyGrid();
+                updateAllDraggers();
+            });
+
+            window.addEventListener('mouseup', () => { isDragging = false; });
+            return { el, updatePos };
+        }
+
+        const draggers = [
+            createDragger('v', 0), // Linea verticale 1
+            createDragger('v', 1), // Linea verticale 2
+            createDragger('h', 0), // Linea orizzontale 1
+            createCornerHandle(0, 0), // Angolo intersezione 1
+            createCornerHandle(1, 0)  // Angolo intersezione 2
+        ];
+
+        function updateAllDraggers() {
+            draggers.forEach(d => d.updatePos());
+        }
+
+    </script>
+</body>
+</html>

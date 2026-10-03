@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archivio Articoli</title>
+    <style>
+        :root {
+            --border-color: #000;
+            --text-color: #111;
+            --bg-color: #fff;
+            --font-main: "Times New Roman", Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-main);
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            padding: 20px 40px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* HEADER */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+        
+        .logo {
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 15px solid black;
+            position: relative;
+        }
+        .logo::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: -10px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 15px solid black;
+        }
+
+        .menu-link {
+            text-decoration: none;
+            color: var(--text-color);
+        }
+
+       main {
+            display: flex;
+            gap: 20px; /* Aumentato lo spazio tra la lista articoli e il blocco di testo a destra */
+            position: relative;
+            margin-top: 20px; /* Spinge la lista un po' più giù rispetto al logo/menu */
+        }
+
+        /* COLONNA SINISTRA: ARCHIVIO */
+        .archive-list {
+            flex: 1;
+            max-width: 70%;
+        }
+
+       .row-header {
+            display: grid;
+            grid-template-columns: 40px 3fr 2fr 2fr 100px;
+            padding: 10px 0;
+            font-weight: normal;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 0px solid var(--border-color); /* Linea sotto l'header */
+            margin-bottom: 0;
+        }
+
+       .row {
+            display: grid;
+            grid-template-columns: 40px 3fr 2fr 2fr 100px;
+            border-bottom: 1px solid var(--border-color); /* Linea sotto ogni riga */
+            padding: 12px 0;
+            cursor: pointer;
+            align-items: start;
+            transition: padding 0.3s ease;
+        }
+
+        .col {
+            padding-right: 10px;
+        }
+
+        .article-title {
+            text-transform: uppercase;
+        }
+
+        /* Info nascoste di default */
+        .info-content {
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            line-height: 1.6;
+        }
+
+        /* HOVER SULLA RIGA */
+        .row:hover {
+            padding-bottom: 40px; /* Allarga la riga */
+        }
+        
+        .row:hover .info-content {
+            opacity: 1;
+            max-height: 100px; /* Fa comparire le info */
+            margin-top: 5px;
+        }
+
+        /* COLONNA DESTRA: PREVIEW TESTO E IMMAGINI */
+        .preview-area {
+            width: 30%;
+            position: relative;
+        }
+
+        .preview-text {
+            font-size: 13px;
+            line-height: 1.4;
+            text-align: justify;
+            color: #333;
+        }
+
+        .image-stack-container {
+            position: absolute;
+            top: 50px;
+            left: 50px;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Lascia che il mouse interagisca col testo sotto se necessario */
+        }
+
+        .stacked-img-wrapper {
+            position: absolute;
+            width: 250px; /* Grandezza e proporzioni fisse */
+            height: 350px;
+            background: #ccc;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: opacity 0.5s ease;
+            overflow: hidden;
+        }
+
+        .stacked-img-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: grayscale(20%) contrast(1.1); /* Tocco cool/editoriale */
+        }
+
+        .img-tag {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 10px;
+            mix-blend-mode: difference;
+        }
+
+        /* FOOTER */
+        footer {
+            margin-top: 80px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 15px;
+        }
+        
+        footer a {
+            color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo"></div>
+        <a href="#" class="menu-link">menu</a>
+    </header>
+
+    <main>
+        <!-- LISTA ARTICOLI -->
+        <div class="archive-list">
+            <div class="row-header">
+                <div class="col">n.</div>
+                <div class="col">article</div>
+                <div class="col">info</div>
+                <div class="col">author:</div>
+                <div class="col" style="text-align: right;">date</div>
+            </div>
+
+            <!-- Riga generata dinamicamente o inserita a mano -->
+            <div class="row" data-id="1">
+                <div class="col">1.</div>
+                <div class="col article-title">BURNOUT CLARITY</div>
+                <div class="col"><div class="info-content">Italy<br>Editorial<br>5 mins</div></div>
+                <div class="col">Michele Mazzocchi</div>
+                <div class="col" style="text-align: right;">January 2026</div>
+            </div>
+            
+            <div class="row" data-id="2">
+                <div class="col">2.</div>
+                <div class="col article-title">ROAD TO NOWHERE</div>
+                <div class="col"><div class="info-content">USA<br>Essay<br>12 mins</div></div>
+                <div class="col">Olmo Notarianni</div>
+                <div class="col" style="text-align: right;">January 2026</div>
+            </div>
+
+            <div class="row" data-id="3">
+                <div class="col">3.</div>
+                <div class="col article-title">WEAVING MY RHAPSODY</div>
+                <div class="col"><div class="info-content">UK<br>Poetry<br>3 mins</div></div>
+                <div class="col">Matilde Filippi</div>
+                <div class="col" style="text-align: right;">January 2026</div>
+            </div>
+
+            <div class="row" data-id="4">
+                <div class="col">4.</div>
+                <div class="col article-title">DON't MISS YOUR STOP</div>
+                <div class="col"><div class="info-content">France<br>Fiction<br>7 mins</div></div>
+                <div class="col">Lenny Stratas</div>
+                <div class="col" style="text-align: right;">April 2026</div>
+            </div>
+
+            <!-- Riga "aperta" per mostrare l'esempio di ZHOURAT -->
+            <div class="row" data-id="9">
+                <div class="col">9.</div>
+                <div class="col article-title">ZHOURAT</div>
+                <div class="col"><div class="info-content">Italy<br>Fiction<br>8 mins</div></div>
+                <div class="col">Suna Houssein Nasser</div>
+                <div class="col" style="text-align: right;">May 2026</div>
+            </div>
+            
+            <div class="row" data-id="10">
+                <div class="col">10.</div>
+                <div class="col article-title">A GAME OF PRETENCE</div>
+                <div class="col"><div class="info-content">Spain<br>Essay<br>10 mins</div></div>
+                <div class="col">Lorenzo Giovine</div>
+                <div class="col" style="text-align: right;">January 2026</div>
+            </div>
+
+            <!-- Nuove righe aggiunte -->
+            <div class="row" data-id="11">
+                <div class="col">11.</div>
+                <div class="col article-title">WHY THE HELL SHOULD YOU NOT READ THIS?</div>
+                <div class="col"><div class="info-content">UK<br>Review<br>5 mins</div></div>
+                <div class="col">Arya Solanki</div>
+                <div class="col" style="text-align: right;">January 2026</div>
+            </div>
+
+            <div class="row" data-id="12">
+                <div class="col">12.</div>
+                <div class="col article-title">THE HAND OF GOD</div>
+                <div class="col"><div class="info-content">Italy<br>Fiction<br>9 mins</div></div>
+                <div class="col">Scafoglio</div>
+                <div class="col" style="text-align: right;">January 2026</div>
+            </div>
+
+            <div class="row" data-id="13">
+                <div class="col">13.</div>
+                <div class="col article-title">FIND YOUR PATH</div>
+                <div class="col"><div class="info-content">USA<br>Essay<br>4 mins</div></div>
+                <div class="col">Morani & Sergber</div>
+                <div class="col" style="text-align: right;">January 2026</div>
+            </div>
+
+            <!-- Riga generata dinamicamente o inserita a mano -->
+            <div class="row" data-id="14">
+                <div class="col">1.</div>
+                <div class="col article-title">BURNOUT CLARITY</div>
+                <div class="col"><div class="info-content">Italy<br>Editorial<br>5 mins</div></div>
+                <div class="col">Michele Mazzocchi</div>
+                <div class="col" style="text-align: right;">January 2026</div>
+            </div>
+            
+            <div class="row" data-id="15">
+                <div class="col">2.</div>
+                <div class="col article-title">ROAD TO NOWHERE</div>
+                <div class="col"><div class="info-content">USA<br>Essay<br>12 mins</div></div>
+                <div class="col">Olmo Notarianni</div>
+                <div class="col" style="text-align: right;">January 2026</div>
+            </div>
+
+            <div class="row" data-id="16">
+                <div class="col">3.</div>
+                <div class="col article-title">WEAVING MY RHAPSODY</div>
+                <div class="col"><div class="info-content">UK<br>Poetry<br>3 mins</div></div>
+                <div class="col">Matilde Filippi</div>
+                <div class="col" style="text-align: right;">January 2026</div>
+            </div>
+
+            <div class="row" data-id="17">
+                <div class="col">4.</div>
+                <div class="col article-title">DON't MISS YOUR STOP</div>
+                <div class="col"><div class="info-content">France<br>Fiction<br>7 mins</div></div>
+                <div class="col">Lenny Stratas</div>
+                <div class="col" style="text-align: right;">April 2026</div>
+            </div>
+
+            <!-- Riga "aperta" per mostrare l'esempio di ZHOURAT -->
+            <div class="row" data-id="18">
+                <div class="col">9.</div>
+                <div class="col article-title">ZHOURAT</div>
+                <div class="col"><div class="info-content">Italy<br>Fiction<br>8 mins</div></div>
+                <div class="col">Suna Houssein Nasser</div>
+                <div class="col" style="text-align: right;">May 2026</div>
+            </div>
+            
+            <div class="row" data-id="19">
+                <div class="col">10.</div>
+                <div class="col article-title">A GAME OF PRETENCE</div>
+                <div class="col"><div class="info-content">Spain<br>Essay<br>10 mins</div></div>
+                <div class="col">Lorenzo Giovine</div>
+                <div class="col" style="text-align: right;">January 2026</div>
+            </div>
+        </div>
+
+        <!-- AREA DESTRA: TESTO E IMMAGINI -->
+       <!-- AREA DESTRA: TESTO E IMMAGINI -->
+        <div class="preview-area">
+            <div class="preview-text" id="dynamic-preview-text">
+                Passa il mouse su un articolo per leggere l'anteprima. Il testo cambierà dinamicamente adattandosi alla lunghezza dell'estratto.
+            </div>
+            <div class="image-stack-container" id="image-stack"></div>
+        </div>
+    </main>
+
+    <footer>
+        <span>Wanna be part of this list?</span>
+        <a href="#">Contact us</a>
+    </footer>
+
+    <script>
+        const rows = document.querySelectorAll('.row');
+        const imageStack = document.getElementById('image-stack');
+        const previewTextElement = document.getElementById('dynamic-preview-text'); // L'elemento del testo
+        let zIndexCounter = 1;
+
+        // Array di immagini: Graphic Design, Avant-garde, 3D Abstract, Poster Art
+       // Array di immagini stile Enrico Isidori: Speculative, Archival, Editorial, Brutalist
+        const designImages = [
+            'https://enricoisidori.com/assets/digitalforest/optimized/01.webp',
+            'https://enricoisidori.com/assets/rhytuals/optimized/r-1.webp',
+            'https://enricoisidori.com/assets/n-plus/optimized/n-1.webp',
+            'https://enricoisidori.com/assets/imageofabook/optimized/3.webp',
+            'https://enricoisidori.com/assets/pixelpushing/optimized/preview1.webp',
+            'https://enricoisidori.com/assets/monolite/optimized/2.webp',
+            'https://enricoisidori.com/assets/n-plus/optimized/adv1.webp'
+
+
+        ];
+
+       // Array di testi molto più lunghi e corposi (blocco unico)
+        const dynamicTexts = [
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Praesent accumsan, lacus sit amet scelerisque vestibulum, ligula magna varius magna, id tempus est lorem in quam. Phasellus mattis est sit amet hendrerit tempus. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Praesent accumsan, lacus sit amet scelerisque vestibulum, ligula magna varius magna, id tempus est lorem in quam. Phasellus mattis est sit amet hendrerit tempus.", 
+            
+            "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Praesent accumsan, lacus sit amet scelerisque vestibulum, ligula magna varius magna, id tempus est lorem in quam. Phasellus mattis est sit amet hendrerit tempus.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Praesent accumsan, lacus sit amet scelerisque vestibulum, ligula magna varius magna, id tempus est lorem in quam. Phasellus mattis est sit amet hendrerit tempus.", 
+            
+            "At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident, similique sunt in culpa qui officia deserunt mollitia animi, id est laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus, omnis voluptas assumenda est, omnis dolor repellendus. Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe.", 
+            
+            "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Praesent accumsan, lacus sit amet scelerisque vestibulum, ligula magna varius magna, id tempus est lorem in quam. Phasellus mattis est sit amet hendrerit tempus.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Praesent accumsan, lacus sit amet scelerisque vestibulum, ligula magna varius magna, id tempus est lorem in quam. Phasellus mattis est sit amet hendrerit tempus.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Praesent accumsan, lacus sit amet scelerisque vestibulum, ligula magna varius magna, id tempus est lorem in quam. Phasellus mattis est sit amet hendrerit tempus.", 
+            
+            "Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur? Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas nulla pariatur? At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident, similique sunt in culpa qui officia deserunt mollitia animi, id est laborum et dolorum fuga."
+        ];
+        // Gestione hover sulle righe
+        rows.forEach((row, index) => {
+            row.addEventListener('mouseenter', () => {
+                
+                // 1. CAMBIA IL TESTO
+                // Prende un testo dall'array basandosi sull'indice della riga
+                previewTextElement.innerText = dynamicTexts[index % dynamicTexts.length];
+                
+                // 2. GESTISCE LE IMMAGINI
+                const imgWrapper = document.createElement('div');
+                imgWrapper.className = 'stacked-img-wrapper';
+
+                const randomX = Math.floor(Math.random() * 60) - 30;
+                const randomY = Math.floor(Math.random() * 60) - 30;
+                
+                const baseTop = (zIndexCounter * 5) % 80; 
+                const baseLeft = (zIndexCounter * 8) % 60;
+
+                imgWrapper.style.top = `${baseTop + randomY}px`;
+                imgWrapper.style.left = `${baseLeft + randomX}px`;
+                imgWrapper.style.zIndex = zIndexCounter++;
+
+                const img = document.createElement('img');
+                img.src = designImages[index % designImages.length]; 
+                
+                const tag = document.createElement('div');
+                tag.className = 'img-tag';
+                tag.innerText = '@title';
+
+                imgWrapper.appendChild(img);
+                imgWrapper.appendChild(tag);
+                imageStack.appendChild(imgWrapper);
+
+                // Timer: elimina l'immagine dopo 5 secondi
+                setTimeout(() => {
+                    if (imgWrapper.parentNode) {
+                        imgWrapper.style.opacity = '0'; 
+                        setTimeout(() => imgWrapper.remove(), 500); 
+                    }
+                }, 5000);
+            });
+        });
+    </script>
+</body>
+</html>

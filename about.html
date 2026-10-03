@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GUI Controlled Block</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 300vh;
+            background-color: #f5f5f5;
+            font-family: 'Times New Roman', Times, serif;
+        }
+        
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            z-index: -1; 
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+<body>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import GUI from 'lil-gui';
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#f5f5f5');
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 0, 8); // Telecamera avvicinata di default
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const guiParams = {
+            rotationY: -125,
+            height: 0.6,
+            wireframeMode: false,
+            interactionMode: 'hover', // Nuova opzione per testare Hover o Click
+            cameraDistance: 8 // Parametro per gestire lo zoom in tempo reale
+        };
+
+        const tower = new THREE.Group();
+        scene.add(tower);
+
+        // Array per gestire un numero scalabile di blocchi
+        let blockMeshes = [];
+        let activeBlockIndex = -1;
+
+        function randomInRange(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        // I tuoi 9 testi (ordinati dal basso verso l'alto per la logica di costruzione 3D)
+        const blockTexts = [
+            "Follow Us",                 // 9 (Fondo)
+            "Submission Guidelines",     // 8
+            "Call for Articles",         // 7
+            "Manifesto",                 // 6
+            "Content & Voices",          // 5
+            "On the Platform",           // 4
+            "Context",                   // 3
+            "Vision",                    // 2
+            "What is Antitesi??"         // 1 (Cima)
+        ];
+
+        function generateMaterials(w, h, d, text) {
+            const shortSide = d;
+            const longSide = w;
+            const totalWidth = shortSide + longSide;
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const ppu = 512; 
+            
+            canvas.width = totalWidth * ppu;
+            canvas.height = h * ppu;
+            
+            const shortSidePx = shortSide * ppu;
+            
+            if (guiParams.wireframeMode) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#c4c4c4'; 
+                ctx.fillRect(0, 0, shortSidePx, canvas.height);
+                
+                ctx.fillStyle = '#e0e0e0'; 
+                ctx.fillRect(shortSidePx, 0, canvas.width - shortSidePx, canvas.height);
+            }
+            
+            ctx.fillStyle = '#000000';
+            ctx.font = `${canvas.height * 0.55}px "Times New Roman", serif`;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'left';
+            
+            const paddingLeft = 0.25 * ppu;
+            ctx.fillText(text, paddingLeft, canvas.height / 2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+            const materialSettings = { 
+                polygonOffset: true, 
+                polygonOffsetFactor: 1, 
+                polygonOffsetUnits: 1 
+            };
+
+            const mat0 = new THREE.MeshBasicMaterial({ map: texture.clone(), ...materialSettings });
+            mat0.map.repeat.set(shortSide / totalWidth, 1);
+            mat0.map.offset.set(0, 0); 
+            mat0.map.needsUpdate = true;
+            
+            const mat5 = new THREE.MeshBasicMaterial({ map: texture.clone(), ...materialSettings });
+            mat5.map.repeat.set(longSide / totalWidth, 1);
+            mat5.map.offset.set(shortSide / totalWidth, 0); 
+            mat5.map.needsUpdate = true;
+
+            const getMat = (color) => new THREE.MeshBasicMaterial({ 
+                color: guiParams.wireframeMode ? 0xffffff : color,
+                ...materialSettings
+            });
+
+            return [
+                mat0,               
+                getMat(0xc4c4c4),   
+                getMat(0xffffff),   
+                getMat(0xffffff),   
+                getMat(0xe0e0e0),   
+                mat5                
+            ];
+        }
+
+        function createBlockGroup(w, h, d, text, yPos, rotOffset, index) {
+            const group = new THREE.Group();
+            
+            // 1. Mesh Visiva (Il blocco reale)
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mats = generateMaterials(w, h, d, text);
+            const visualMesh = new THREE.Mesh(geo, mats);
+            group.add(visualMesh);
+
+            // Wireframe per la Mesh Visiva
+            const edgesGeo = new THREE.EdgesGeometry(geo);
+            const edgesMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+            const edges = new THREE.LineSegments(edgesGeo, edgesMat);
+            edges.visible = guiParams.wireframeMode;
+            visualMesh.add(edges);
+
+            // 2. Hitbox invisibile per gestire i click/hover senza tremolii
+            const hitBoxGeo = new THREE.BoxGeometry(w, h, d);
+            const hitBoxMat = new THREE.MeshBasicMaterial({ visible: false }); // Invisibile ma rilevabile
+            const hitBoxMesh = new THREE.Mesh(hitBoxGeo, hitBoxMat);
+            group.add(hitBoxMesh);
+
+            // Posizionamento iniziale
+            group.position.y = yPos;
+            group.rotation.y = rotOffset;
+
+            // Salvataggio dati utente necessari per le animazioni
+            group.userData = {
+                baseY: yPos,
+                index: index,
+                hitbox: hitBoxMesh,
+                visual: visualMesh
+            };
+
+            return group;
+        }
+
+        function updateTower() {
+            // Pulizia
+            closeGap(); // Chiude eventuali varchi aperti prima di ricalcolare
+            while(tower.children.length > 0){ 
+                const child = tower.children[0];
+                // Pulisci geometria e materiali della mesh visiva e della hitbox
+                child.children.forEach(mesh => {
+                    mesh.geometry.dispose();
+                    if(Array.isArray(mesh.material)) mesh.material.forEach(m => { if(m.map) m.map.dispose(); m.dispose(); });
+                    else mesh.material.dispose();
+                });
+                tower.remove(child); 
+            }
+            blockMeshes = [];
+
+            const h = guiParams.height;
+            const gap = 0.005;
+            const numBlocks = blockTexts.length;
+
+            // Calcoliamo da dove deve partire il blocco più in basso 
+            // per far sì che l'intera torre di 9 blocchi sia perfettamente centrata nello schermo
+            const startY = -((numBlocks - 1) * (h + gap)) / 2;
+
+            blockTexts.forEach((text, i) => {
+                // Generazione randomica per larghezza (w) e profondità (d)
+                const w = randomInRange(2.8, 4.2);
+                const d = randomInRange(1.4, 2.2);
+                // Rotazione randomica limitata tra -5 e +5 gradi
+                const rotOffset = randomInRange(-5, 5) * (Math.PI / 180);
+                
+                // Posizione Y nello stack
+                const yPos = startY + i * (h + gap);
+                
+                const blockGrp = createBlockGroup(w, h, d, text, yPos, rotOffset, i);
+                tower.add(blockGrp);
+                blockMeshes.push(blockGrp);
+            });
+
+            tower.rotation.set(0, guiParams.rotationY * (Math.PI / 180), 0);
+        }
+
+        updateTower();
+
+        const gui = new GUI();
+        
+        // Nuovo controllo per la distanza della telecamera (Zoom)
+        gui.add(guiParams, 'cameraDistance', 3, 20, 0.1).name('Distanza Camera').onChange(value => {
+            camera.position.z = value;
+        });
+
+        gui.add(guiParams, 'interactionMode', ['hover', 'click']).name('Modalità Azione').onChange(closeGap);
+        
+        gui.add(guiParams, 'rotationY', -180, 180, 1).name('Rotazione Y (Gradi)').onChange(value => {
+            tower.rotation.y = value * (Math.PI / 180);
+        });
+
+        gui.add(guiParams, 'height', 0.1, 5, 0.1).name('Altezza Costante').onChange(updateTower);
+        
+        gui.add(guiParams, 'wireframeMode').name('Bianco e Wireframe').onChange(updateTower);
+
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2(-10, -10); // Inizializzato fuori schermo
+
+        // Dimensione del varco: 1.5 volte l'altezza
+        const getGapSize = () => guiParams.height * 1.5;
+
+        function openGap(targetIndex) {
+            activeBlockIndex = targetIndex;
+            const gapAmount = getGapSize();
+
+            blockMeshes.forEach((blockGroup, i) => {
+                let targetY = blockGroup.userData.baseY;
+                const hitbox = blockGroup.userData.hitbox;
+                
+                if (targetIndex === 0) {
+                    // ECCEZIONE: Se è l'ultimo blocco in fondo, il varco si apre SOPRA.
+                    if (i === 0) {
+                        targetY -= gapAmount / 2; // Lui scende
+                    } else {
+                        targetY += gapAmount / 2; // Tutti gli altri salgono
+                    }
+                } else {
+                    // REGOLA STANDARD: Il varco si apre SOTTO il blocco cliccato/hoverato.
+                    if (i >= targetIndex) {
+                        targetY += gapAmount / 2; // Il blocco e chi gli sta sopra salgono
+                    } else {
+                        targetY -= gapAmount / 2; // Chi sta sotto scende
+                    }
+                }
+
+                // Animazione morbida della posizione
+                gsap.to(blockGroup.position, {
+                    y: targetY,
+                    duration: 0.6,
+                    ease: 'power3.out',
+                    overwrite: 'auto'
+                });
+
+                // Magia dell'Hitbox per evitare il Jitter: 
+                // Scaliamo l'hitbox invisibile del blocco bersaglio per coprire lo spazio del varco appena creato!
+                if (i === targetIndex) {
+                    hitbox.scale.y = 1 + (gapAmount / guiParams.height);
+                    if (targetIndex === 0) {
+                        hitbox.position.y = gapAmount / 2; // Espandi verso l'alto per riempire il varco sopra
+                    } else {
+                        hitbox.position.y = -gapAmount / 2; // Espandi verso il basso per riempire il varco sotto
+                    }
+                } else {
+                    hitbox.scale.y = 1;
+                    hitbox.position.y = 0;
+                }
+            });
+        }
+
+        function closeGap() {
+            if (activeBlockIndex === -1) return;
+            activeBlockIndex = -1;
+
+            blockMeshes.forEach((blockGroup) => {
+                // Riporta tutti alla posizione base
+                gsap.to(blockGroup.position, {
+                    y: blockGroup.userData.baseY,
+                    duration: 0.6,
+                    ease: 'power3.out',
+                    overwrite: 'auto'
+                });
+                
+                // Resetta le hitbox fantasma
+                const hitbox = blockGroup.userData.hitbox;
+                hitbox.scale.y = 1;
+                hitbox.position.y = 0;
+            });
+        }
+
+        function checkIntersection(isClick = false) {
+            raycaster.setFromCamera(pointer, camera);
+            
+            // Raccogliamo solo le hitbox invisibili per il raycast
+            const hitboxes = blockMeshes.map(b => b.userData.hitbox);
+            const intersects = raycaster.intersectObjects(hitboxes);
+
+            if (intersects.length > 0) {
+                const hitObj = intersects[0].object;
+                const group = hitObj.parent;
+                const index = group.userData.index;
+
+                if (isClick) {
+                    // In modalità Click, se clicco lo stesso lo chiudo, altrimenti apro/cambio
+                    if (activeBlockIndex === index) {
+                        closeGap();
+                    } else {
+                        openGap(index);
+                    }
+                } else {
+                    // In modalità Hover, apro/cambio appena ci passo sopra
+                    if (activeBlockIndex !== index) {
+                        openGap(index);
+                    }
+                }
+            } else {
+                // Nessun blocco toccato
+                if (activeBlockIndex !== -1 && guiParams.interactionMode === 'hover' && !isClick) {
+                    closeGap(); // Chiudi solo se siamo in modalità hover
+                }
+            }
+        }
+
+        window.addEventListener('pointermove', (event) => {
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            if (guiParams.interactionMode === 'hover') {
+                checkIntersection(false);
+            }
+        });
+
+        window.addEventListener('click', () => {
+            if (guiParams.interactionMode === 'click') {
+                checkIntersection(true);
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Variabili per gestire la rotazione dinamica fluida
+        let targetHorizontalRot = 0;
+        let currentHorizontalRot = 0;
+
+        // Ascoltiamo l'evento "wheel" (trackpad/mouse) per catturare lo scroll orizzontale
+        window.addEventListener('wheel', (event) => {
+            // event.deltaX cattura lo scroll orizzontale (es. swipe laterale a due dita)
+            // Moltiplicatore 0.003 per calibrare la sensibilità
+            targetHorizontalRot -= event.deltaX * 0.003; 
+        }, { passive: true });
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const scrollY = window.scrollY;
+            const maxScroll = document.body.scrollHeight - window.innerHeight;
+            let scrollPercent = maxScroll > 0 ? scrollY / maxScroll : 0;
+            scrollPercent = Math.max(0, Math.min(1, scrollPercent));
+            
+            // Calcoliamo dinamicamente il limite di viaggio della telecamera
+            const towerHeight = blockTexts.length * guiParams.height;
+            const cameraTravel = (towerHeight / 2) + 2; 
+            
+            camera.position.y = cameraTravel - (scrollPercent * (cameraTravel * 2));
+            
+            // INVECE di guardare sempre al centro, la telecamera guarda verso il punto Y a cui si trova
+            camera.lookAt(0, camera.position.y, 0);
+
+            // --- NUOVA LOGICA DI ROTAZIONE DINAMICA ---
+            // 1. Fluidità (Interpolazione) per lo scroll orizzontale: ammorbidisce il movimento
+            currentHorizontalRot += (targetHorizontalRot - currentHorizontalRot) * 0.1;
+            
+            // 2. Minima rotazione legata allo scroll verticale (0.5 radianti = ~28 gradi di torsione totale)
+            const verticalRot = scrollPercent * 0.5; 
+            
+            // 3. Rotazione di base impostata dalla GUI
+            const baseRot = guiParams.rotationY * (Math.PI / 180);
+            
+            // Applichiamo la somma delle tre rotazioni alla torre in tempo reale
+            tower.rotation.y = baseRot + currentHorizontalRot + verticalRot;
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>

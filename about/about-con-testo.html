@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antitesi - HTML Overlay</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 300vh;
+            background-color: #f5f5f5;
+            font-family: 'Times New Roman', Times, serif;
+            overflow-x: hidden;
+        }
+        
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            z-index: 1; 
+        }
+
+        /* Il nostro overlay magico in vera tipografia HTML */
+        #text-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 60%; /* Leggermente allargato per far respirare il testo centrato */
+            max-width: 600px;
+            font-family: 'Times New Roman', Times, serif, Arial, Helvetica, sans-serif;
+            font-size: 1.15rem;
+            line-height: 1.4;
+            color: #111;
+            
+            /* RISOLTO: Ora il testo è semplicemente centrato, senza forzature di tracking */
+            text-align: center; 
+            
+            /* Gestione degli "a capo" per testi lunghi e scalettati */
+            white-space: pre-wrap;
+            
+            /* Fondamentale per non bloccare il laser del mouse */
+            pointer-events: none; 
+            
+            opacity: 0;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.4s ease;
+            z-index: 10;
+        }
+
+        #text-overlay.visible {
+            opacity: 1;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+<body>
+    
+    <!-- Div che fluttuerà nel varco -->
+    <div id="text-overlay"></div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "lil-gui": "https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import GUI from 'lil-gui';
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#f5f5f5');
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 0, 8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const guiParams = {
+            rotationY: -125,
+            height: 0.6,
+            wireframeMode: false,
+            interactionMode: 'hover',
+            cameraDistance: 8 
+        };
+
+        const tower = new THREE.Group();
+        scene.add(tower);
+
+        // Ancora 3D invisibile per tracciare il centro del varco
+        const textAnchor = new THREE.Object3D();
+        tower.add(textAnchor);
+
+        let blockMeshes = [];
+        let activeBlockIndex = -1;
+        const textOverlayElement = document.getElementById('text-overlay');
+
+        function randomInRange(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        const blockTexts = [
+            "Follow Us",                 // 9 (index 0)
+            "Submission Guidelines",     // 8 (index 1)
+            "Call for Articles",         // 7 (index 2)
+            "Manifesto",                 // 6 (index 3)
+            "Content & Voices",          // 5 (index 4)
+            "On the Platform",           // 4 (index 5)
+            "Context",                   // 3 (index 6)
+            "Vision",                    // 2 (index 7)
+            "What is Antitesi??"         // 1 (index 8)
+        ];
+
+        // Qui mapperemo i testi ai rispettivi indici
+        const gapTexts = {
+            0: "Stay close to what we're building. New articles, processes behind the work, and conversations that don't fit anywhere else.\n\n@ANTITESIMAGAZINE",
+            1: "Write a brief pitch detailing your idea.\n\nSTEP 02\nIf accepted, draft an article under 2,000 words.\n\nSTEP 03\nSchedule a call with our team of programmers and graphic designers to finalise your Antitesi.\n\nMULTIMEDIA\nImages, playlists, film references, clips, sketches. Anything that accompanied your work.\nantitesimagazine@gmail.com, Send your pitch or questions and we'll get back to you.\n\nTONE\nPersonal, clear, intellectually alive.",
+            2: "Antitesi is looking for short, personal pieces that pull back the curtain on a thesis, a research project, or a university obsession.\nThink of it as backstage notes: the detours, discoveries, and moments that made you care about something absurdly specific.\nYour voice can be sharp, dry, playful, serious. Or all of them at once. The only condition is sincerity.\nShow us the heart of your thesis. You have 2,000 words. What should your readers know?\nShare your niche in a fresh way: a metaphor, a sketch, a mini-game, a diagram. Something that lets readers follow the logic without being specialists.",
+            3: "Truth is more interesting than polish.\nWriting clarifies thinking. Sharing honestly builds understanding. When you articulate what drives your work, you discover what you truly care about. And so do your readers.",
+            4: "Diversity as a condition of production, not a background detail.\nContributions come from different parts of the world and from varied socio-economic backgrounds — from highly mobile, international contexts to more constrained or unstable conditions. This diversity is not framed as background. It is part of how knowledge is produced.",
+            5: "A space for ongoing processes, not finished outcomes.\nAntitesi hosts articles, visual work, and hybrid formats that reflect work in development. A research project can appear alongside its process. An artwork can expose its internal logic. A text can open into a wider field of inquiry. Each contribution connects to others, forming a network where people, stories, and processes intersect and evolve.",
+            6: "Knowledge exists. But it rarely circulates beyond its origin.\nUniversities generate an increasing volume of highly specialised knowledge, much of which remains locked within disciplines and institutional structures. Dominant media environments favour speed and simplification, often flattening complexity.",
+            7: "Emerging from within the university, without remaining confined to it.\nAntitesi begins where knowledge is produced: across students, researchers, and emerging practitioners. It redefines how that knowledge circulates by shifting the focus from results to processes. Academic work is no longer a finished product to be evaluated, but something in motion, open to encounter, extension, and transformation.",
+            8: "Antitesi enhances how knowledge is shared by making its processes accessible, integrating form, context, and development so that complexity remains intact."
+        };
+
+        function generateMaterials(w, h, d, text) {
+            const shortSide = d;
+            const longSide = w;
+            const totalWidth = shortSide + longSide;
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const ppu = 512; 
+            
+            canvas.width = totalWidth * ppu;
+            canvas.height = h * ppu;
+            
+            const shortSidePx = shortSide * ppu;
+            
+            if (guiParams.wireframeMode) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#c4c4c4'; 
+                ctx.fillRect(0, 0, shortSidePx, canvas.height);
+                
+                ctx.fillStyle = '#e0e0e0'; 
+                ctx.fillRect(shortSidePx, 0, canvas.width - shortSidePx, canvas.height);
+            }
+            
+            ctx.fillStyle = '#000000';
+            ctx.font = `${canvas.height * 0.55}px "Times New Roman", serif`;
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'left';
+            
+            const paddingLeft = 0.25 * ppu;
+            ctx.fillText(text, paddingLeft, canvas.height / 2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+            const materialSettings = { 
+                polygonOffset: true, 
+                polygonOffsetFactor: 1, 
+                polygonOffsetUnits: 1 
+            };
+
+            const mat0 = new THREE.MeshBasicMaterial({ map: texture.clone(), ...materialSettings });
+            mat0.map.repeat.set(shortSide / totalWidth, 1);
+            mat0.map.offset.set(0, 0); 
+            
+            const mat5 = new THREE.MeshBasicMaterial({ map: texture.clone(), ...materialSettings });
+            mat5.map.repeat.set(longSide / totalWidth, 1);
+            mat5.map.offset.set(shortSide / totalWidth, 0); 
+
+            const getMat = (color) => new THREE.MeshBasicMaterial({ 
+                color: guiParams.wireframeMode ? 0xffffff : color,
+                ...materialSettings
+            });
+
+            return [ mat0, getMat(0xc4c4c4), getMat(0xffffff), getMat(0xffffff), getMat(0xe0e0e0), mat5 ];
+        }
+
+        function createBlockGroup(w, h, d, text, yPos, rotOffset, index) {
+            const group = new THREE.Group();
+            
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mats = generateMaterials(w, h, d, text);
+            const visualMesh = new THREE.Mesh(geo, mats);
+            group.add(visualMesh);
+
+            const edgesGeo = new THREE.EdgesGeometry(geo);
+            const edgesMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+            const edges = new THREE.LineSegments(edgesGeo, edgesMat);
+            edges.visible = guiParams.wireframeMode;
+            visualMesh.add(edges);
+
+            const hitBoxGeo = new THREE.BoxGeometry(w, h, d);
+            const hitBoxMat = new THREE.MeshBasicMaterial({ visible: false }); 
+            const hitBoxMesh = new THREE.Mesh(hitBoxGeo, hitBoxMat);
+            group.add(hitBoxMesh);
+
+            group.position.y = yPos;
+            group.rotation.y = rotOffset;
+
+            group.userData = { baseY: yPos, index: index, hitbox: hitBoxMesh, visual: visualMesh };
+
+            return group;
+        }
+
+        function updateTower() {
+            closeGap(); 
+            while(tower.children.length > 1){ // Tralascia textAnchor (index 0)
+                const child = tower.children[1];
+                child.children.forEach(mesh => {
+                    mesh.geometry.dispose();
+                    if(Array.isArray(mesh.material)) mesh.material.forEach(m => { if(m.map) m.map.dispose(); m.dispose(); });
+                    else mesh.material.dispose();
+                });
+                tower.remove(child); 
+            }
+            blockMeshes = [];
+
+            const h = guiParams.height;
+            const gap = 0.005;
+            const numBlocks = blockTexts.length;
+            const startY = -((numBlocks - 1) * (h + gap)) / 2;
+
+            blockTexts.forEach((text, i) => {
+                const w = randomInRange(2.8, 4.2);
+                const d = randomInRange(1.4, 2.2);
+                const rotOffset = randomInRange(-5, 5) * (Math.PI / 180);
+                const yPos = startY + i * (h + gap);
+                
+                const blockGrp = createBlockGroup(w, h, d, text, yPos, rotOffset, i);
+                tower.add(blockGrp);
+                blockMeshes.push(blockGrp);
+            });
+
+            tower.rotation.set(0, guiParams.rotationY * (Math.PI / 180), 0);
+        }
+
+        updateTower();
+
+        const gui = new GUI();
+        gui.add(guiParams, 'cameraDistance', 3, 20, 0.1).name('Distanza Camera').onChange(value => camera.position.z = value);
+        gui.add(guiParams, 'interactionMode', ['hover', 'click']).name('Modalità Azione').onChange(closeGap);
+        gui.add(guiParams, 'rotationY', -180, 180, 1).name('Rotazione Y').onChange(value => tower.rotation.y = value * (Math.PI / 180));
+        gui.add(guiParams, 'height', 0.1, 5, 0.1).name('Altezza').onChange(updateTower);
+        gui.add(guiParams, 'wireframeMode').name('Wireframe').onChange(updateTower);
+
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2(-10, -10); 
+        
+        // Calcolo dinamico dello spazio in base alla lunghezza e ai paragrafi del testo
+        const getGapSize = (index) => {
+            if (!gapTexts[index]) return guiParams.height * 2.2;
+            
+            const textLength = gapTexts[index].length;
+            const lineBreaks = (gapTexts[index].match(/\n/g) || []).length;
+            
+            // Base minima (2.2) + aumento per lunghezza (1 unita ogni ~250 char) + extra per i ritorni a capo
+            const calculatedMultiplier = 2.2 + (textLength / 250) + (lineBreaks * 0.3);
+            
+            return guiParams.height * calculatedMultiplier;
+        };
+
+        function openGap(targetIndex) {
+            activeBlockIndex = targetIndex;
+            const gapAmount = getGapSize(targetIndex);
+
+            // Calcola il centro spaziale del varco
+            let gapCenterY = 0;
+            if (targetIndex === 0) {
+                gapCenterY = (blockMeshes[0].userData.baseY + blockMeshes[1].userData.baseY) / 2;
+            } else {
+                gapCenterY = (blockMeshes[targetIndex].userData.baseY + blockMeshes[targetIndex - 1].userData.baseY) / 2;
+            }
+            // Muove l'ancora nel punto esatto di mezzo
+            textAnchor.position.set(0, gapCenterY, 0);
+
+            // Inserisce il testo se esiste, e lo fa comparire in dissolvenza con un attimo di ritardo
+            if (gapTexts[targetIndex]) {
+                textOverlayElement.innerText = gapTexts[targetIndex];
+                setTimeout(() => {
+                    if(activeBlockIndex === targetIndex) textOverlayElement.classList.add('visible');
+                }, 250); // Attende che i blocchi inizino ad aprirsi
+            } else {
+                textOverlayElement.innerText = "";
+                textOverlayElement.classList.remove('visible');
+            }
+
+            blockMeshes.forEach((blockGroup, i) => {
+                let targetY = blockGroup.userData.baseY;
+                const hitbox = blockGroup.userData.hitbox;
+                
+                if (targetIndex === 0) {
+                    if (i === 0) targetY -= gapAmount / 2; 
+                    else targetY += gapAmount / 2; 
+                } else {
+                    if (i >= targetIndex) targetY += gapAmount / 2; 
+                    else targetY -= gapAmount / 2; 
+                }
+
+                gsap.to(blockGroup.position, { y: targetY, duration: 0.6, ease: 'power3.out', overwrite: 'auto' });
+
+                if (i === targetIndex) {
+                    hitbox.scale.y = 1 + (gapAmount / guiParams.height);
+                    hitbox.position.y = (targetIndex === 0) ? gapAmount / 2 : -gapAmount / 2;
+                } else {
+                    hitbox.scale.y = 1;
+                    hitbox.position.y = 0;
+                }
+            });
+        }
+
+        function closeGap() {
+            if (activeBlockIndex === -1) return;
+            activeBlockIndex = -1;
+            
+            textOverlayElement.classList.remove('visible');
+
+            blockMeshes.forEach((blockGroup) => {
+                gsap.to(blockGroup.position, { y: blockGroup.userData.baseY, duration: 0.6, ease: 'power3.out', overwrite: 'auto' });
+                const hitbox = blockGroup.userData.hitbox;
+                hitbox.scale.y = 1;
+                hitbox.position.y = 0;
+            });
+        }
+
+        function checkIntersection(isClick = false) {
+            raycaster.setFromCamera(pointer, camera);
+            const hitboxes = blockMeshes.map(b => b.userData.hitbox);
+            const intersects = raycaster.intersectObjects(hitboxes);
+
+            if (intersects.length > 0) {
+                const hitObj = intersects[0].object;
+                const index = hitObj.parent.userData.index;
+
+                if (isClick) {
+                    if (activeBlockIndex === index) closeGap();
+                    else openGap(index);
+                } else {
+                    if (activeBlockIndex !== index) openGap(index);
+                }
+            } else {
+                if (activeBlockIndex !== -1 && guiParams.interactionMode === 'hover' && !isClick) {
+                    closeGap(); 
+                }
+            }
+        }
+
+        window.addEventListener('pointermove', (event) => {
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            if (guiParams.interactionMode === 'hover') checkIntersection(false);
+        });
+
+        window.addEventListener('click', () => {
+            if (guiParams.interactionMode === 'click') checkIntersection(true);
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        let targetHorizontalRot = 0;
+        let currentHorizontalRot = 0;
+        const tempVector = new THREE.Vector3(); // Vettore per proiettare il 3D sullo schermo
+
+        window.addEventListener('wheel', (event) => {
+            targetHorizontalRot -= event.deltaX * 0.003; 
+        }, { passive: true });
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const scrollY = window.scrollY;
+            const maxScroll = document.body.scrollHeight - window.innerHeight;
+            let scrollPercent = maxScroll > 0 ? scrollY / maxScroll : 0;
+            scrollPercent = Math.max(0, Math.min(1, scrollPercent));
+            
+            const towerHeight = blockTexts.length * guiParams.height;
+            const cameraTravel = (towerHeight / 2) + 2; 
+            
+            camera.position.y = cameraTravel - (scrollPercent * (cameraTravel * 2));
+            camera.lookAt(0, camera.position.y, 0);
+
+            currentHorizontalRot += (targetHorizontalRot - currentHorizontalRot) * 0.1;
+            const verticalRot = scrollPercent * 0.5; 
+            const baseRot = guiParams.rotationY * (Math.PI / 180);
+            
+            tower.rotation.y = baseRot + currentHorizontalRot + verticalRot;
+
+            // ---- LA MAGIA DEL TEXT OVERLAY ----
+            // Se il testo è visibile, proiettiamo il punto 3D in 2D e aggiorniamo il div
+            if (activeBlockIndex !== -1 && textOverlayElement.classList.contains('visible')) {
+                // Prende la posizione dell'ancora nel mondo 3D
+                textAnchor.getWorldPosition(tempVector);
+                // "Traduce" la coordinata rispetto all'obiettivo della telecamera
+                tempVector.project(camera);
+                
+                // Se è davanti alla telecamera (z < 1), calcola X e Y in pixel
+                if (tempVector.z < 1) {
+                    const x = (tempVector.x * 0.5 + 0.5) * window.innerWidth;
+                    const y = -(tempVector.y * 0.5 - 0.5) * window.innerHeight;
+                    
+                    // Sposta istantaneamente il div su quelle coordinate
+                    textOverlayElement.style.left = `${x}px`;
+                    textOverlayElement.style.top = `${y}px`;
+                }
+            } 
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
