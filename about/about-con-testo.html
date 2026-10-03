@@ -9,7 +9,8 @@
             margin: 0;
             padding: 0;
             height: 300vh;
-            background-color: #f5f5f5;
+            /* CAMBIA IL COLORE DI SFONDO CSS QUI (es: #fafafa, #ffffff, #e0e0e0) */
+            background-color: #fafafa;
             font-family: 'Times New Roman', Times, serif;
             overflow-x: hidden;
         }
@@ -76,7 +77,8 @@
         import GUI from 'lil-gui';
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color('#f5f5f5');
+        // CAMBIA IL COLORE DI SFONDO 3D QUI (deve essere uguale al colore CSS sopra)
+        scene.background = new THREE.Color('#fafafa');
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
         camera.position.set(0, 0, 8);
@@ -86,16 +88,21 @@
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
+        // Manteniamo i parametri per la logica del codice, ma senza i controlli a schermo
         const guiParams = {
             rotationY: -125,
             height: 0.6,
             wireframeMode: false,
             interactionMode: 'hover',
-            cameraDistance: 8 
+            cameraDistance: 8,
+            towerOffsetY: 3.4 // Valore fisso a 3.4, nascosto dalla GUI
         };
 
         const tower = new THREE.Group();
         scene.add(tower);
+        
+        // NUOVO: Imposta la posizione Y della torre all'avvio
+        tower.position.y = guiParams.towerOffsetY;
 
         // Ancora 3D invisibile per tracciare il centro del varco
         const textAnchor = new THREE.Object3D();
@@ -256,6 +263,9 @@
 
         const gui = new GUI();
         gui.add(guiParams, 'cameraDistance', 3, 20, 0.1).name('Distanza Camera').onChange(value => camera.position.z = value);
+        
+        // Lo slider towerOffsetY è stato rimosso dalla GUI
+        
         gui.add(guiParams, 'interactionMode', ['hover', 'click']).name('Modalità Azione').onChange(closeGap);
         gui.add(guiParams, 'rotationY', -180, 180, 1).name('Rotazione Y').onChange(value => tower.rotation.y = value * (Math.PI / 180));
         gui.add(guiParams, 'height', 0.1, 5, 0.1).name('Altezza').onChange(updateTower);
@@ -394,10 +404,15 @@
             let scrollPercent = maxScroll > 0 ? scrollY / maxScroll : 0;
             scrollPercent = Math.max(0, Math.min(1, scrollPercent));
             
-            const towerHeight = blockTexts.length * guiParams.height;
-            const cameraTravel = (towerHeight / 2) + 2; 
+            // Calcoliamo la posizione reale (mondo 3D) della cima e del fondo della torre
+            const topY = guiParams.towerOffsetY + ((blockTexts.length / 2) * guiParams.height); 
+            const bottomY = guiParams.towerOffsetY - ((blockTexts.length / 2) * guiParams.height);
             
-            camera.position.y = cameraTravel - (scrollPercent * (cameraTravel * 2));
+            // Aggiungiamo un margine per far respirare i varchi (specialmente in fondo)
+            const startCamY = topY - 1; 
+            const endCamY = bottomY - 0.5; 
+            
+            camera.position.y = startCamY - (scrollPercent * (startCamY - endCamY));
             camera.lookAt(0, camera.position.y, 0);
 
             currentHorizontalRot += (targetHorizontalRot - currentHorizontalRot) * 0.1;
